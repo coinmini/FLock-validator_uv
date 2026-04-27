@@ -1,7 +1,6 @@
 import os
 import shutil
 import subprocess
-import sys
 from pathlib import Path
 from typing import List, Optional
 
@@ -57,11 +56,45 @@ def resolve_project_environment() -> Optional[str]:
     return None
 
 
-def sync_extra(project_root: Path, extra: str, env_vars: Optional[dict] = None):
-    """Sync the project venv with base deps + a specific optional-dependency extra."""
-    logger.info(f"Syncing uv environment with extra '{extra}' at {project_root}")
+def sync_project(project_root: Path, extra: str, env_vars: Optional[dict] = None):
+    """Sync the uv-managed project venv with base deps + a specific extra.
+
+    Use when uv owns the venv (no pre-existing activated venv). Enforces
+    lockfile consistency: installs/upgrades/downgrades to match resolution.
+    """
+    logger.info(f"Syncing uv project environment with extra '{extra}' at {project_root}")
     run_command(
         ["uv", "sync", "--extra", extra],
+        cwd=str(project_root),
+        env=env_vars,
+    )
+
+
+def install_into_existing_venv(
+    project_root: Path,
+    venv_path: str,
+    extra: str,
+    env_vars: Optional[dict] = None,
+):
+    """Install only missing deps into an existing user-managed venv.
+
+    Uses `uv pip install` (not `uv sync`) so we don't downgrade or remove
+    packages the user already has. Existing satisfying versions are kept;
+    only missing requirements (and their transitive deps) get installed.
+    """
+    logger.info(
+        f"Installing extras '{extra}' into existing venv {venv_path} (additive, no removals)"
+    )
+    run_command(
+        [
+            "uv",
+            "pip",
+            "install",
+            "--python",
+            venv_path,
+            "-e",
+            f".[{extra}]",
+        ],
         cwd=str(project_root),
         env=env_vars,
     )
@@ -70,12 +103,27 @@ def sync_extra(project_root: Path, extra: str, env_vars: Optional[dict] = None):
 def run_in_env(
     project_root: Path,
     command: List[str],
+    venv_path: Optional[str] = None,
     env_vars: Optional[dict] = None,
 ):
-    """Run a command inside the project's uv-managed venv."""
+    """Run a command inside the target venv.
+
+    If `venv_path` is given (existing user venv), invoke its python directly
+    to avoid uv re-syncing. Otherwise use `uv run` against the project venv.
+    """
+    if venv_path:
+        python_bin = str(Path(venv_path) / "bin" / "python")
+        logger.info(f"Running command {command} via {python_bin}")
+        # Replace leading "python" if present so callers can pass either form.
+        if command and command[0] == "python":
+            cmd = [python_bin, *command[1:]]
+        else:
+            cmd = [python_bin, *command]
+        run_command(cmd, cwd=str(project_root), env=env_vars)
+        return
+
     logger.info(f"Running command {command} via uv at {project_root}")
-    cmd = ["uv", "run"] + command
-    run_command(cmd, cwd=str(project_root), env=env_vars)
+    run_command(["uv", "run", *command], cwd=str(project_root), env=env_vars)
 
 
 def ensure_env_and_run(
@@ -84,18 +132,34 @@ def ensure_env_and_run(
     command: List[str],
     env_vars: Optional[dict] = None,
 ):
-    """Ensure the venv has the requested extra installed, then run the command.
+    """Ensure deps for `extra` are present, then run the command.
 
-    If the caller has an activated venv (VIRTUAL_ENV set) or has set
-    UV_PROJECT_ENVIRONMENT explicitly, that venv is reused — uv installs the
-    requested extra into it instead of creating a fresh `.venv/`.
+    Two modes:
+    - Reuse mode: VIRTUAL_ENV / UV_PROJECT_ENVIRONMENT points at an existing
+      venv. Use `uv pip install` to add only what's missing — never downgrade
+      or remove already-installed packages — and run the command with that
+      venv's interpreter directly.
+    - Project mode: no pre-existing venv. Use `uv sync` to manage `.venv/`
+      strictly per pyproject.toml + uv.lock, then run via `uv run`.
     """
     ensure_uv_installed()
 
     project_env = resolve_project_environment()
-    overrides = dict(env_vars) if env_vars else {}
-    if project_env:
-        overrides["UV_PROJECT_ENVIRONMENT"] = project_env
+    base_env = dict(env_vars) if env_vars else {}
 
-    sync_extra(project_root, extra, env_vars=overrides or None)
-    run_in_env(project_root, command, env_vars=overrides or None)
+    if project_env:
+        install_into_existing_venv(
+            project_root,
+            project_env,
+            extra,
+            env_vars=base_env or None,
+        )
+        run_in_env(
+            project_root,
+            command,
+            venv_path=project_env,
+            env_vars=base_env or None,
+        )
+    else:
+        sync_project(project_root, extra, env_vars=base_env or None)
+        run_in_env(project_root, command, env_vars=base_env or None)
