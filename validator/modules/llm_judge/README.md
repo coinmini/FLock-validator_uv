@@ -6,8 +6,8 @@ The LLM Judge module is a validation system that evaluates Large Language Model 
 
 ## Prerequisites
 
-- Conda package manager
-- Python 3.12
+- [uv](https://docs.astral.sh/uv/) package manager
+- Python 3.12 (uv will install it automatically if missing)
 - HuggingFace account and token
 - FLock API key
 - Access to OpenAI-compatible API endpoint (e.g. FLock API Platfrom)
@@ -16,7 +16,7 @@ The LLM Judge module is a validation system that evaluates Large Language Model 
 
 ### 1. Install Dependencies
 
-The module uses a conda environment that is automatically created when you run the module for the first time. The environment is defined in `environment.yml` and includes:
+The module uses a uv-managed virtual environment that is automatically created/synced when you run the module for the first time. Dependencies are declared in the root `pyproject.toml` under the `llm_judge` optional-dependency group, and include:
 
 - Python 3.12
 - OpenAI API client
@@ -25,7 +25,7 @@ The module uses a conda environment that is automatically created when you run t
 - PEFT
 - And other dependencies
 
-The environment will be automatically created with the name `flock-validation-llm_judge`.
+`run.py` will run `uv sync --extra llm_judge` automatically before invoking the module.
 
 ### 2. Configure Environment Variables
 

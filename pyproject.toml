@@ -1,0 +1,48 @@
+[project]
+name = "flock-validator"
+version = "0.1.0"
+description = "Flock LLM Validator - modular validation system for Flock AI Arena assignments"
+requires-python = "==3.12.*"
+dependencies = [
+    "pydantic",
+    "loguru",
+    "click",
+    "requests",
+    "gitpython",
+]
+
+[project.optional-dependencies]
+llm_judge = [
+    "openai>=1.0.0",
+    "httpx",
+    "pydantic>=2.0.0",
+    "transformers==5.3.0",
+    "torch>=1.13.1",
+    "accelerate>=0.27.2",
+    "loguru>=0.6.0",
+    "huggingface-hub==1.5.0",
+    "tenacity",
+    "peft==0.18.1",
+    "python-dotenv",
+    "jinja2",
+]
+lora = [
+    "numpy",
+    "pandas",
+]
+rl = [
+    "numpy",
+    "onnxruntime",
+    "onnx",
+    "huggingface-hub",
+]
+all = [
+    "flock-validator[llm_judge,lora,rl]",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["validator"]

@@ -2,19 +2,19 @@
 
 ## Overview
 
-The Flock LLM Validator script is a modular system for doing validation for Flock AI Arena validation assignments. It is designed to manage an isolated conda environment for each task type, fetch validation assignments from the Flock API, execute the validation, and submit results back to the API. The system is extensible, allowing new validation modules or task types to be added easily.
+The Flock LLM Validator script is a modular system for doing validation for Flock AI Arena validation assignments. It uses a single [uv](https://docs.astral.sh/uv/)-managed virtual environment with per-module optional-dependency groups, fetches validation assignments from the Flock API, executes the validation, and submits results back to the API. The system is extensible, allowing new validation modules or task types to be added easily.
 
 The project is split into two layers:
-1. The outer layer that runs outside conda and is responsible for managing and running conda environments for each module.
-2. The inner layer that runs inside conda and is responsible for all validation and assignment orchestration logic.
+1. The outer layer that runs outside the venv and is responsible for syncing module dependencies and launching the inner runner via `uv run`.
+2. The inner layer that runs inside the venv and is responsible for all validation and assignment orchestration logic.
 
 ## Setup
 
-1. Install miniconda (e.g. [miniconda](https://www.anaconda.com/docs/getting-started/miniconda/install))
-2. Install dependencies:
+1. Install [uv](https://docs.astral.sh/uv/getting-started/installation/) (e.g. `curl -LsSf https://astral.sh/uv/install.sh | sh`).
+2. No manual dependency install is required — `run.py` will run `uv sync --extra <module>` automatically on first launch. To pre-install everything yourself:
 
 ```bash
-pip install -r requirements.txt
+uv sync --extra all
 ```
 
 ## Usage
